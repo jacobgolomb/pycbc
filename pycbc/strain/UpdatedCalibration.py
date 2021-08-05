@@ -1,8 +1,17 @@
+#Authors Jacob Golomb, Richard Udall, Colm Talbot, Derek Davis
+
 import pycbc
 import numpy as np
 import tables
+from abc import (ABCMeta, abstractmethod)
+from six import add_metaclass
+from scipy.interpolate import UnivariateSpline, interp1d
+from pycbc.filter import get_cutoff_indices
+from pycbc.types import FrequencySeries
 
+#Jacob says: Skip to CubicSpline
 
+@add_metaclass(ABCMeta)
 class Recalibrate(object):
     """ Base class for modifying calibration """
     name = None
@@ -10,7 +19,7 @@ class Recalibrate(object):
     def __init__(self, ifo_name):
         self.ifo_name = ifo_name
         self.params = dict()
-
+        
     @abstractmethod
     def apply_calibration(self, strain):
         """Apply calibration model
@@ -97,6 +106,8 @@ class CubicSpline(Recalibrate):
 
     spline_points: array of frequencies where calibration curves are sampled (only used if supplying dict of parameters)
     params: dictionary of parameters 'amplitude_{ifo}_{#}' and 'phase_{ifo}_{#}, corresponding to spline points (only used if supplying dict of parameters)
+        important note: this assumes that amplitude params are percent errors (i.e. 'amplitude_H1_0'=1.04 wold be a +4% miscalibration error
+        in Hanford at the 0th index frequency spline point)
     calibration_file: HDF5 file from calibration group used to generate spline in amplitude and phase space (only used if generating from file)
     spline_index: index of the specific spline from the HDF5 file to use. Enumerated for reproducability (only used if generating spline from file)
     number of spline points
@@ -106,14 +117,16 @@ class CubicSpline(Recalibrate):
     def __init__(self, spline_points=None, params=None,
                  ifo_name = None, calibration_file = None, spline_index=0):
         Recalibrate.__init__(self, ifo_name=ifo_name)
+        """Initializes the object
+        Must supply either a calibration file or
+        dictionary of parameters to initialize the splines.
+        """
         
         self.spline_index = spline_index
         self.spline_points = spline_points
+        self.calibration_file = calibration_file
         
-        if params:
-            self.params.update(**params)
-            
-        self.set_spline()
+        self.set_spline(params)
         
         
     def apply_calibration(self, strain):
@@ -131,35 +144,51 @@ class CubicSpline(Recalibrate):
         strain_adjusted : FrequencySeries
             The recalibrated strain.
         """
-        delta_amplitude = self.amplitude_spline(strain.sample_frequencies.numpy())
+        amplitude_relative = self.amplitude_spline(strain.sample_frequencies.numpy())
+        delta_phase = self.phase_spline(strain.sample_frequencies.numpy())
 
-        delta_phase =self.phase_spline(strain.sample_frequencies.numpy())
-
-        strain_adjusted = strain * (1.0 + delta_amplitude)\
+        strain_adjusted = strain * (amplitude_relative)\
             * (2.0 + 1j * delta_phase) / (2.0 - 1j * delta_phase)
 
         return strain_adjusted
     
     def set_spline(self, params=None):
+        """Creates the cubic spline interpolations by either inputing a new
+        dict of parameters, or using the calibration group HDF5 file.
+        If this is called and the object does not have a calibration file or 
+        parameter dictionary to use, it will throw an error.
         
-        if not self.calibration_file:
-            self.calibration_amplitudes = [self.params['amplitude_{}_{}'.format(self.ifo_name, ii)] for ii in range(self.n_points)]
+        Parameters
+        ----------
+
+        params : dictionary, optional
+            Parameters 'amplitude_{ifo}_{#}' and 'phase_{ifo}_{#}, corresponding to spline points (only used if supplying dict of parameters)
+            important note: this assumes that amplitude params are percent errors (i.e. 'amplitude_H1_0'=1.04 wold be a +4% miscalibration error
+            in Hanford at the 0th index frequency spline point)
+        """
+        
+        if params:
+            self.params.update(**params)
+            self.calibration_amplitude = [self.params['amplitude_{}_{}'.format(self.ifo_name, ii)] for ii in range(self.n_points)]
             self.calibration_phase = [self.params['phase_{}_{}'.format(self.ifo_name, ii)] for ii in range(self.n_points)]
             self.calibration_frequencies = self.spline_points
         
-        else:
-            self.get_spline_from_file()
-            
-        self.amplitude_spline = UnivariateSpline(self.calibration_frequencies, self.calibration_amplitude)
-        self.phase_spline = UnivariateSpline(self.calibration_frequencies, self.calibration_phase)
+        elif self.calibration_file:
+            self.get_spline_params_from_file()
         
-    def get_spline_from_file(self):        
-        
+        self.amplitude_spline = interp1d(self.calibration_frequencies, self.calibration_amplitude, 'cubic', fill_value='extrapolate')
+        self.phase_spline = interp1d(self.calibration_frequencies, self.calibration_phase, 'cubic', fill_value='extrapolate')
+
+    def get_spline_params_from_file(self):        
+        """Samples spline points (frequency, amplitude) and (frequency, phase) 
+        from an HDF5 file with the format used by the calibration group.
+        Stores these as arrays internally.
+        """
         calibration_file = tables.open_file(self.calibration_file, 'r')
         calibration_amplitude = \
-            calibration_file.root.deltaR.draws_amp_rel[self.spline_index]
+            calibration_file.root.deltaR.draws_amp_rel[self.spline_index:self.spline_index+1]
         calibration_phase = \
-            calibration_file.root.deltaR.draws_phase[self.spline_index]
+            calibration_file.root.deltaR.draws_phase[self.spline_index:self.spline_index+1]
 
         calibration_frequencies = calibration_file.root.deltaR.freq[:]
 
@@ -175,26 +204,49 @@ class CubicSpline(Recalibrate):
         self.calibration_frequencies = calibration_frequencies
         
     def calibration_optimal_snr(self, strain, psd = None, low_frequency_cutoff=None, high_frequency_cutoff=None):
+        """Calculates the optimal SNR between an input waveform and
+        a miscalibrated waveform. If no PSD is given, this is just
+        proportional to a(non-weighted) inner product between 
+        the waveform and miscalibrated waveform.
         
-        #strain = make_frequency_series(strain)
+        Parameters
+        ----------
         
-        N = (len(htilde)-1) * 2
-        norm = 4.0 * htilde.delta_f
+        strain: pycbc FrequencySeries or TimeSeries object
+            The input template waveform generated with pycbc.
+        psd: FrequencySeries, optional
+            The psd used to weight the accumulated power
+        low_frequency_cutoff : {None, float}, optional
+            The frequency to begin considering waveform power.
+        high_frequency_cutoff : {None, float}, optional
+            The frequency to stop considering waveform power.
+            
+        Return
+        ------
+        snr_cal_opt: float
+        """
+        if type(strain) == pycbc.types.TimeSeries:
+            strain = strain.to_FrequencySeries()
+            
+        N = (len(strain)-1) * 2
+        norm = 4.0 * strain.delta_f
         kmin, kmax = get_cutoff_indices(low_frequency_cutoff,
-                                       high_frequency_cutoff, htilde.delta_f, N)
-        ht = htilde[kmin:kmax]
+                                       high_frequency_cutoff, strain.delta_f, N)
+        ht = strain[kmin:kmax]
         
         ht_calib = self.apply_calibration(ht)
         
+        ht_calib = FrequencySeries(ht_calib.squeeze(), delta_f = ht.delta_f)
+
         if psd:
             try:
-                numpy.testing.assert_almost_equal(ht.delta_f, psd.delta_f)
+                np.testing.assert_almost_equal(ht.delta_f, psd.delta_f)
             except AssertionError:
                 raise ValueError('Waveform does not have same delta_f as psd')
 
         if psd is None:
             sq = ht.inner(ht_calib)
         else:
-            sq = ht.weighted_inner(ht_calib, psd[kmin:kmax])
+            sq = ht.weighted_inner(ht_calib, weight = psd[kmin:kmax])
 
         return sq.real * norm
