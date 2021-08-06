@@ -508,7 +508,8 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
     def apply(self, strain, detector_name, f_lower=None, distance_scale=1,
               simulation_ids=None,
               inj_filter_rejector=None,
-              injection_sample_rate=None,):
+              injection_sample_rate=None,
+              recalibration=None,):
         """Add injections (as seen by a particular detector) to a time series.
 
         Parameters
@@ -576,6 +577,8 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             signal = self.make_strain_from_inj_object(inj, delta_t,
                      detector_name, f_lower=f_l,
                      distance_scale=distance_scale)
+            if recalibration is not None:
+                signal = recalibration.apply_calibration(signal)
             signal = resample_to_delta_t(signal, strain.delta_t, method='ldas')
             if float(signal.start_time) > t1:
                 continue
@@ -653,7 +656,8 @@ class RingdownHDFInjectionSet(_HDFInjectionSet):
     required_params = ('tc',)
 
     def apply(self, strain, detector_name, distance_scale=1,
-              simulation_ids=None, inj_filter_rejector=None):
+              simulation_ids=None, inj_filter_rejector=None,
+              recalibration=None,):
         """Add injection (as seen by a particular detector) to a time series.
 
         Parameters
@@ -702,6 +706,8 @@ class RingdownHDFInjectionSet(_HDFInjectionSet):
             signal = self.make_strain_from_inj_object(
                 injection, strain.delta_t, detector_name,
                 distance_scale=distance_scale)
+            if recalibration is not None:
+                signal = recalibration.apply_calibration(signal)
             signal = signal.astype(strain.dtype)
             signal_lal = signal.lal()
             add_injection(lalstrain, signal_lal, None)
@@ -1182,7 +1188,8 @@ class SGBurstInjectionSet(object):
             self.indoc, lsctables.SimBurstTable.tableName)
         self.extra_args = kwds
 
-    def apply(self, strain, detector_name, f_lower=None, distance_scale=1):
+    def apply(self, strain, detector_name, f_lower=None, distance_scale=1,
+              recalibration=None,):
         """Add injections (as seen by a particular detector) to a time series.
 
         Parameters
@@ -1245,6 +1252,8 @@ class SGBurstInjectionSet(object):
             # compute the detector response, taper it if requested
             # and add it to the strain
             strain = wfutils.taper_timeseries(strain, inj.taper)
+            if recalibration is not None:
+                hp = recalibration.apply_calibration(hp)
             signal_lal = hp.astype(strain.dtype).lal()
             add_injection(lalstrain, signal_lal, None)
 
