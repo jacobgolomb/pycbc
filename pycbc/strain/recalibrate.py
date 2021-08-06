@@ -27,7 +27,7 @@ import h5py
 import numpy as np
 from scipy.interpolate import UnivariateSpline, interp1d
 from pycbc.filter import get_cutoff_indices
-from pycbc.types import FrequencySeries
+from pycbc.types import FrequencySeries, TimeSeries
 
 
 @add_metaclass(ABCMeta)
@@ -168,6 +168,11 @@ class CubicSpline(Recalibrate):
         strain_adjusted : FrequencySeries
             The recalibrated strain.
         """
+        ts = False
+        if isinstance(strain, TimeSeries):
+            ts = True
+            strain = strain.to_frequencyseries()
+
         amplitude_relative = \
             self.amplitude_spline(strain.sample_frequencies.numpy())
         
@@ -175,6 +180,11 @@ class CubicSpline(Recalibrate):
 
         strain_adjusted = strain * (amplitude_relative)\
             * (2.0 + 1j * delta_phase) / (2.0 - 1j * delta_phase)
+        strain_adjusted = FrequencySeries(strain_adjusted,
+                                          delta_f=strain.delta_f,
+                                          epoch=strain.epoch)
+        if ts:
+            strain_adjusted = strain_adjusted.to_timeseries()
 
         return strain_adjusted
     
@@ -220,7 +230,8 @@ class CubicSpline(Recalibrate):
                                 self.calibration_phase, 'cubic',
                                 fill_value='extrapolate')
 
-def get_spline_params_from_file(self, spline_index=None, seed=None, random=False):        
+    def get_spline_params_from_file(self, spline_index=None, 
+                                    seed=None, random=False):        
         """Samples spline points (frequency, amplitude) and (frequency, phase) 
         from an HDF5 file with the format used by the calibration group.
         Stores these as arrays internally.
@@ -231,10 +242,8 @@ def get_spline_params_from_file(self, spline_index=None, seed=None, random=False
 
         calibration_file = h5py.File(self.calibration_file, 'r')
 
-        len_amp = len(calibration_file['deltaR']['draws_amp_rel']\
-                      [spline_index:spline_index+1])
-        len_phase = len(calibration_file['deltaR']['draws_phase']\
-                      [spline_index:spline_index+1])
+        len_amp = len(calibration_file['deltaR']['draws_amp_rel'][:])
+        len_phase = len(calibration_file['deltaR']['draws_phase'][:])
         assert len_amp == len_phase
 
         if random: 
@@ -260,9 +269,11 @@ def get_spline_params_from_file(self, spline_index=None, seed=None, random=False
         if len(calibration_amplitude.dtype) != 0:  
             calibration_amplitude = calibration_amplitude.view(np.float64).\
                 reshape(calibration_amplitude.shape + (-1,))
+            calibration_amplitude = np.squeeze(calibration_amplitude)
             
             calibration_phase = calibration_phase.view(np.float64).\
                 reshape(calibration_phase.shape + (-1,))
+            calibration_phase = np.squeeze(calibration_phase)
             
             calibration_frequencies = calibration_frequencies.view(np.float64)  
             
@@ -270,7 +281,7 @@ def get_spline_params_from_file(self, spline_index=None, seed=None, random=False
         self.calibration_phase = calibration_phase
         self.calibration_frequencies = calibration_frequencies
 
-    def map_to_adjust(self, strain, prefix=**params):
+    def map_to_adjust(self, strain, prefix='recalib_', **params):
         """Map an input dictionary of sampling parameters to the
         apply_calibration function by filtering the dictionary for the
         calibration parameters, then calling apply_calibration.
