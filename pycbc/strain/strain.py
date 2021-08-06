@@ -315,28 +315,15 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
         if not opt.calibration_ifo:
             ValueError('Please provide --calibration-ifo '
                        'if you are providing a calibration file.')
-        if len(opt.calibration_file) == 1:
-            calibration_file = opt.calibration_file[0]
-        else:
-            # assume that only one of the provided files is relevant
-            # for the chosen strain segment
-            cal_dict = dict(c.split(":") for c in opt.calibration_file)
-            t_key = float(min(list(cal_dict.keys())))
-            for t in cal_dict.keys():
-                t_f = float(t)
-                if t_f<float(strain.start_time) and t_f>t_key:
-                    t_key = t
-            calibration_file = cal_dict[t_key]
-
         logging.info("Calibration file set to %s"%calibration_file)
-        calibration = CubicSpline(calibration_file = calibration_file,
+        calibration = CubicSpline(calibration_file = opt.calibration_file,
                                   ifo_name = opt.calibration_ifo)
         calibration.set_spline(spline_index=cal_index, 
                                seed=opt.calibration_seed, 
                                random=opt.random_spline)
 
     if opt.recalibrate_injections:
-        if not calibration_file:
+        if not opt.calibration_file:
             ValueError('Please provide a calibration file '
                        'in order to recalibrate injections.')
         else:
@@ -345,7 +332,7 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
         
 
     if opt.recalibrate_strain:
-        if not calibration_file:
+        if not opt.calibration_file:
             ValueError('Please provide a calibration file '
                        'in order to recalibrate strain.')
         else:
@@ -658,10 +645,8 @@ def insert_strain_option_group(parser, gps_times=True):
                     help="filter length in seconds for the transfer function")
 
     # Calibration options
-    data_reading_group.add_argument("--calibration-file", nargs="+",
-                    help='(optional) Text file of calibration splines.'
-                         ' Can be given as either TIME:FILE for multiple'
-                         ' files. or FILE for a single file.')
+    data_reading_group.add_argument("--calibration-file", type=str,
+                    help='(optional) HDF5 file of calibration splines.')
     data_reading_group.add_argument("--recalibrate-strain", 
                     action='store_true', 
                     help="(optional)  Recalibrate strain data.")
