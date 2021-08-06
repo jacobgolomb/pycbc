@@ -315,23 +315,25 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
         if not opt.calibration_ifo:
             ValueError('Please provide --calibration-ifo '
                        'if you are providing a calibration file.')
-        if len(opt.calibration_file) == 1
-            calibration_file = opt.calibration_file
+        if len(opt.calibration_file) == 1:
+            calibration_file = opt.calibration_file[0]
         else:
             # assume that only one of the provided files is relevant
             # for the chosen strain segment
             cal_dict = dict(c.split(":") for c in opt.calibration_file)
-            t_key = cal_dict.keys()[0]
+            t_key = float(min(list(cal_dict.keys())))
             for t in cal_dict.keys():
-                if t<strain.start_time and t>t_key:
+                t_f = float(t)
+                if t_f<float(strain.start_time) and t_f>t_key:
                     t_key = t
             calibration_file = cal_dict[t_key]
 
-            calibration = CubicSpline(calibration_file = calibration_file,
-                                      ifo_name = opt.calibration_ifo)
-            calibration.set_spline(spline_index=cal_index, 
-                                   seed=opt.calibration_seed, 
-                                   random=opt.random_spline)
+        logging.info("Calibration file set to %s"%calibration_file)
+        calibration = CubicSpline(calibration_file = calibration_file,
+                                  ifo_name = opt.calibration_ifo)
+        calibration.set_spline(spline_index=cal_index, 
+                               seed=opt.calibration_seed, 
+                               random=opt.random_spline)
 
     if opt.recalibrate_injections:
         if not calibration_file:
@@ -339,6 +341,7 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
                        'in order to recalibrate injections.')
         else:
             inj_calibration = calibration
+            logging.info("Injection recalibration enabled")
         
 
     if opt.recalibrate_strain:
@@ -346,6 +349,7 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
             ValueError('Please provide a calibration file '
                        'in order to recalibrate strain.')
         else:
+            logging.info("Calibrating strain data")
             strain = calibration.apply_calibration(strain)
 
     if injector is not None:
@@ -673,7 +677,7 @@ def insert_strain_option_group(parser, gps_times=True):
     data_reading_group.add_argument("--calibration-index", type=int,
                     help="(optional) Index to use for generating" 
                          " splines.")
-    data_reading_group.add_argument("--calibration-ifo", type=int,
+    data_reading_group.add_argument("--calibration-ifo", type=str,
                     help="(optional) IFO to use for generating"
                          " splines.")
 
