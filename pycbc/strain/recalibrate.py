@@ -220,19 +220,37 @@ class CubicSpline(Recalibrate):
                                 self.calibration_phase, 'cubic',
                                 fill_value='extrapolate')
 
-    def get_spline_params_from_file(self):        
+def get_spline_params_from_file(self, spline_index=None, seed=None, random=False):        
         """Samples spline points (frequency, amplitude) and (frequency, phase) 
         from an HDF5 file with the format used by the calibration group.
         Stores these as arrays internally.
         """
+
+        if seed is not None:
+            np.random.seed(seed)
+
         calibration_file = h5py.File(self.calibration_file, 'r')
+
+        len_amp = len(calibration_file['deltaR']['draws_amp_rel']\
+                      [spline_index:spline_index+1])
+        len_phase = len(calibration_file['deltaR']['draws_phase']\
+                      [spline_index:spline_index+1])
+        assert len_amp == len_phase
+
+        if random: 
+            spline_index = np.random.randint(low=0, high=len_amp) 
+
+        if spline_index is None:
+            spline_index = self.spline_index
+        else:
+            self.spline_index = spline_index
         
         calibration_amplitude = \
             calibration_file['deltaR']['draws_amp_rel']\
-                [self.spline_index:self.spline_index+1]
+                [spline_index:spline_index+1]
         calibration_phase = \
             calibration_file['deltaR']['draws_phase']\
-                [self.spline_index:self.spline_index+1]
+                [spline_index:spline_index+1]
 
         calibration_frequencies = calibration_file['deltaR']['freq'][:]
 
