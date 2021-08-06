@@ -178,7 +178,7 @@ class CubicSpline(Recalibrate):
 
         return strain_adjusted
     
-    def set_spline(self, params=None):
+    def set_spline(self, params=None, **kwargs):
         """Creates the cubic spline interpolations by either inputing a new
         dict of parameters, or using the calibration group HDF5 file.
         If this is called and the object does not have a calibration file or 
@@ -210,7 +210,7 @@ class CubicSpline(Recalibrate):
             self.calibration_frequencies = self.spline_points
         
         elif self.calibration_file:
-            self.get_spline_params_from_file()
+            self.get_spline_params_from_file(**kwargs)
         
         self.amplitude_spline = interp1d(self.calibration_frequencies, 
                                 self.calibration_amplitude,'cubic',
