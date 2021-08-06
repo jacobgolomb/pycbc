@@ -269,6 +269,33 @@ def get_spline_params_from_file(self, spline_index=None, seed=None, random=False
         self.calibration_amplitude = calibration_amplitude
         self.calibration_phase = calibration_phase
         self.calibration_frequencies = calibration_frequencies
+
+    def map_to_adjust(self, strain, prefix=**params):
+        """Map an input dictionary of sampling parameters to the
+        apply_calibration function by filtering the dictionary for the
+        calibration parameters, then calling apply_calibration.
+
+        Parameters
+        ----------
+        strain : FrequencySeries
+            The strain to be recalibrated.
+        params : dict
+            Dictionary of sampling parameters which includes
+            calibration parameters.
+
+        Return
+        ------
+        strain_adjusted : FrequencySeries
+            The recalibrated strain.
+        """
+        self.params.update({
+            key[len(prefix):]: params[key]
+            for key in params if prefix in key and self.ifo_name in key})
+        self.set_spline(self.params)
+
+        strain_adjusted = self.apply_calibration(strain)
+
+        return strain_adjusted
         
     def calibration_optimal_snr(self, strain, psd = None,
             low_frequency_cutoff=None, high_frequency_cutoff=None):
