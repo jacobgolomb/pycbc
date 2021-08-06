@@ -606,6 +606,27 @@ def insert_strain_option_group(parser, gps_times=True):
     data_reading_group.add_argument("--witness-filter-length", type=float,
                     help="filter length in seconds for the transfer function")
 
+    # Calibration options
+    data_reading_group.add_argument("--calibration-file", nargs="+",
+                    help='(optional) Text file of calibration splines.'
+                         ' Can be given as either TIME:FILE for multiple'
+                         ' files. or FILE for a single file.')
+    data_reading_group.add_argument("--recalibrate-strain", 
+                    action='store_true', 
+                    help="(optional)  Recalibrate strain data.")
+    data_reading_group.add_argument("--recalibrate-injections", 
+                    action='store_true', 
+                    help="(optional) Recalibrate injections.")
+    data_reading_group.add_argument("--random-spline",
+                    action='store_true', 
+                    help="(optional) Use random spline.")
+    data_reading_group.add_argument("--calibration-seed", type=int,
+                    help="(optional) Seed to use for generating"
+                         " random splines.")
+    data_reading_group.add_argument("--calibration-index", type=int,
+                    help="(optional) Index to use for generating" 
+                         " splines.")
+
     return data_reading_group
 
 # FIXME: This repeats almost all of the options above. Any nice way of reducing
