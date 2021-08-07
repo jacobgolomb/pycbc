@@ -170,7 +170,8 @@ class _XMLInjectionSet(object):
     def apply(self, strain, detector_name, f_lower=None, distance_scale=1,
               simulation_ids=None,
               inj_filter_rejector=None,
-              injection_sample_rate=None,):
+              injection_sample_rate=None,
+              recalibration=None,):
         """Add injections (as seen by a particular detector) to a time series.
 
         Parameters
@@ -237,6 +238,8 @@ class _XMLInjectionSet(object):
                 continue
             signal = self.make_strain_from_inj_object(inj, delta_t,
                     detector_name, f_lower=f_l, distance_scale=distance_scale)
+            if recalibration is not None:
+                signal = recalibration.apply_calibration(signal)
             signal = resample_to_delta_t(signal, strain.delta_t, method='ldas')
             if float(signal.start_time) > t1:
                 continue
