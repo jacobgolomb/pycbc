@@ -315,7 +315,7 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
         if not opt.calibration_ifo:
             ValueError('Please provide --calibration-ifo '
                        'if you are providing a calibration file.')
-        logging.info("Calibration file set to %s"%calibration_file)
+        logging.info("Calibration file set to %s"%opt.calibration_file)
         calibration = CubicSpline(calibration_file = opt.calibration_file,
                                   ifo_name = opt.calibration_ifo)
         calibration.set_spline(spline_index=cal_index, 
