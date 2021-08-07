@@ -171,6 +171,7 @@ class CubicSpline(Recalibrate):
         ts = False
         if isinstance(strain, TimeSeries):
             ts = True
+            dt = strain.delta_t
             strain = strain.to_frequencyseries()
 
         amplitude_relative = \
@@ -184,8 +185,8 @@ class CubicSpline(Recalibrate):
                                           delta_f=strain.delta_f,
                                           epoch=strain.epoch)
         if ts:
-            strain_adjusted = strain_adjusted.to_timeseries()
-
+            strain_adjusted = strain_adjusted.to_timeseries(
+                                             delta_t=dt)
         return strain_adjusted
     
     def set_spline(self, params=None, **kwargs):
