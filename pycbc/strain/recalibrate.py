@@ -2,7 +2,7 @@
 """
 # Copyright (C) 2015 Ben Lackey, Christopher M. Biwer,
 #                    Daniel Finstad, Colm Talbot, Alex Nitz,
-#                    Jacob Golomb, Richard Udall, Derek Davis
+#                    Jacob Golomb, Richard Udall, Derek Davis, Ethan Payne
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -150,7 +150,7 @@ class CubicSpline(Recalibrate):
         self.spline_points = spline_points
         self.calibration_file = calibration_file
         
-        self.set_spline(params)
+        self.set_spline(params, spline_index)
         
         
     def apply_calibration(self, strain):
@@ -189,7 +189,7 @@ class CubicSpline(Recalibrate):
                                              delta_t=dt)
         return strain_adjusted
     
-    def set_spline(self, params=None, **kwargs):
+    def set_spline(self, params=None, spline_index=None, **kwargs):
         """Creates the cubic spline interpolations by either inputing a new
         dict of parameters, or using the calibration group HDF5 file.
         If this is called and the object does not have a calibration file or 
@@ -220,7 +220,10 @@ class CubicSpline(Recalibrate):
             
             self.calibration_frequencies = self.spline_points
         
-        elif self.calibration_file:
+        elif spline_index is not None:
+            self.spline_index = spline_index
+            
+        if not params and self.calibration_file:
             self.get_spline_params_from_file(**kwargs)
         
         self.amplitude_spline = interp1d(self.calibration_frequencies, 
@@ -358,7 +361,7 @@ class CubicSpline(Recalibrate):
         else:
             sq = ht.weighted_inner(ht_calib, weight = psd[kmin:kmax])
 
-        return sq.real * norm
+        return np.sqrt(sq.real * norm)
 
 class PhysicalModel(object):
     """ Class for adjusting time-varying calibration parameters of given
