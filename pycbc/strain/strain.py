@@ -316,10 +316,11 @@ def from_cli(opt, dyn_range_fac=1, precision='single',
             ValueError('Please provide --calibration-ifo '
                        'if you are providing a calibration file.')
         logging.info("Calibration file set to %s"%opt.calibration_file)
+        if opt.calibration_seed:
+            numpy.random.seed(opt.calibration_seed)
         calibration = CubicSpline(calibration_file = opt.calibration_file,
                                   ifo_name = opt.calibration_ifo)
         calibration.set_spline(spline_index=cal_index, 
-                               seed=opt.calibration_seed, 
                                random=opt.random_spline)
 
     if opt.recalibrate_injections:
