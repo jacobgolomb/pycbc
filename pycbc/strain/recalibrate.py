@@ -348,8 +348,6 @@ class CubicSpline(Recalibrate):
         
         ht_calib = self.apply_calibration(ht)
         
-        ht_calib = FrequencySeries(ht_calib.squeeze(), delta_f = ht.delta_f)
-
         if psd:
             try:
                 np.testing.assert_almost_equal(ht.delta_f, psd.delta_f)
