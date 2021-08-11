@@ -139,7 +139,7 @@ class CubicSpline(Recalibrate):
     name = 'cubic_spline'
 
     def __init__(self, spline_points=None, params=None,
-                 ifo_name = None, calibration_file = None, spline_index=0):
+                 ifo_name = None, calibration_file = None, spline_index=None):
         Recalibrate.__init__(self, ifo_name=ifo_name)
         """Initializes the object
         Must supply either a calibration file or
@@ -150,7 +150,7 @@ class CubicSpline(Recalibrate):
         self.spline_points = spline_points
         self.calibration_file = calibration_file
         
-        self.set_spline(params)
+        self.set_spline(params, spline_index)
         
         
     def apply_calibration(self, strain):
@@ -189,7 +189,7 @@ class CubicSpline(Recalibrate):
                                              delta_t=dt)
         return strain_adjusted
     
-    def set_spline(self, params=None, **kwargs):
+    def set_spline(self, params=None, spline_index=None, **kwargs):
         """Creates the cubic spline interpolations by either inputing a new
         dict of parameters, or using the calibration group HDF5 file.
         If this is called and the object does not have a calibration file or 
@@ -219,8 +219,11 @@ class CubicSpline(Recalibrate):
                      for ii in range(self.n_points)]
             
             self.calibration_frequencies = self.spline_points
-        
-        elif self.calibration_file:
+
+        elif spline_index is not None:
+            self.spline_index = spline_index
+
+        if not params and self.calibration_file:
             self.get_spline_params_from_file(**kwargs)
         
         self.amplitude_spline = interp1d(self.calibration_frequencies, 
@@ -358,7 +361,7 @@ class CubicSpline(Recalibrate):
         else:
             sq = ht.weighted_inner(ht_calib, weight = psd[kmin:kmax])
 
-        return sq.real * norm
+        return np.sqrt(sq.real * norm)
 
 class PhysicalModel(object):
     """ Class for adjusting time-varying calibration parameters of given
