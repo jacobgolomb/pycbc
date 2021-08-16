@@ -149,7 +149,7 @@ class CubicSpline(Recalibrate):
         self.spline_index = spline_index
         self.spline_points = spline_points
         self.calibration_file = calibration_file
-        
+    
         self.set_spline(params, spline_index)
         
         
@@ -209,6 +209,7 @@ class CubicSpline(Recalibrate):
         """
         
         if params:
+            self.n_points = len(self.spline_points)
             self.params.update(**params)
             self.calibration_amplitude = \
                 [self.params['amplitude_{}_{}'.format(self.ifo_name, ii)] \
