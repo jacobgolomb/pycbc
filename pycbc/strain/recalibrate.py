@@ -149,7 +149,7 @@ class CubicSpline(Recalibrate):
         self.spline_index = spline_index
         self.spline_points = spline_points
         self.calibration_file = calibration_file
-    
+        
         self.set_spline(params, spline_index)
         
         
@@ -345,10 +345,10 @@ class CubicSpline(Recalibrate):
         kmin, kmax = get_cutoff_indices(low_frequency_cutoff,
                                        high_frequency_cutoff,
                                         strain.delta_f, N)
+        
         ht = strain[kmin:kmax]
-        
-        ht_calib = self.apply_calibration(ht)
-        
+        ht_calib = self.apply_calibration(strain)[kmin:kmax]
+
         if psd:
             try:
                 np.testing.assert_almost_equal(ht.delta_f, psd.delta_f)
